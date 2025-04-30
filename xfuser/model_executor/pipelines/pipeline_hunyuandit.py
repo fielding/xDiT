@@ -1,4 +1,5 @@
 import os
+import inspect
 from typing import Callable, Dict, List, Tuple, Callable, Optional, Union
 
 import torch
@@ -325,11 +326,25 @@ class xFuserHunyuanDiTPipeline(xFuserPipelineBaseWrapper):
         grid_crops_coords = get_resize_crop_region_for_grid(
             (grid_height, grid_width), base_size
         )
-        image_rotary_emb = get_2d_rotary_pos_embed(
-            self.transformer.inner_dim // self.transformer.num_heads,
-            grid_crops_coords,
-            (grid_height, grid_width),
-        )
+        
+        # Check if we're using diffusers >= 0.33.0
+        sig = inspect.signature(get_2d_rotary_pos_embed)
+        if "device" in sig.parameters and "output_type" in sig.parameters:
+            # diffusers >= 0.33.0
+            image_rotary_emb = get_2d_rotary_pos_embed(
+                self.transformer.inner_dim // self.transformer.num_heads,
+                grid_crops_coords,
+                (grid_height, grid_width),
+                device=device,
+                output_type="pt",
+            )
+        else:
+            # diffusers < 0.33.0 fallback
+            image_rotary_emb = get_2d_rotary_pos_embed(
+                self.transformer.inner_dim // self.transformer.num_heads,
+                grid_crops_coords,
+                (grid_height, grid_width),
+            )
 
         style = torch.tensor([0], device=device)
 
